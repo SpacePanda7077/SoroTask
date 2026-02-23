@@ -1,26 +1,30 @@
-require('dotenv').config();
+import dotenv from "dotenv";
 
-const requiredEnvVars = [
-    'SOROBAN_RPC_URL',
-    'NETWORK_PASSPHRASE',
-    'KEEPER_SECRET',
-    'CONTRACT_ID',
-    'POLLING_INTERVAL_MS'
-];
+dotenv.config();
 
-function validateEnv() {
-    const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
-    if (missing.length > 0) {
-        throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-    }
-}
+export function loadConfig() {
+  const required = [
+    "SOROBAN_RPC_URL",
+    "NETWORK_PASSPHRASE",
+    "KEEPER_SECRET",
+    "CONTRACT_ID",
+    "POLLING_INTERVAL_MS",
+  ];
 
-validateEnv();
+  const missing = required.filter((key) => !process.env[key]);
 
-module.exports = {
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`
+    );
+  }
+
+  return {
     rpcUrl: process.env.SOROBAN_RPC_URL,
     networkPassphrase: process.env.NETWORK_PASSPHRASE,
     keeperSecret: process.env.KEEPER_SECRET,
     contractId: process.env.CONTRACT_ID,
-    pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS, 10) || 10000,
-};
+    pollIntervalMs:
+      parseInt(process.env.POLLING_INTERVAL_MS, 10) || 10000,
+  };
+}

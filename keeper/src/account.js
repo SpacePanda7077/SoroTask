@@ -1,4 +1,5 @@
-const { Keypair, Server, Account } = require('soroban-client');
+const { Keypair, rpc, Account } = require('@stellar/stellar-sdk');
+const { Server } = rpc;
 
 /**
  * Loads the keeper's keypair and validates its on-chain state.
@@ -7,12 +8,12 @@ const { Keypair, Server, Account } = require('soroban-client');
  * interacting with Soroban contracts, and the RPC server provides the necessary
  * account state (sequence number, balances) required for transaction building.
  * 
- * @returns {Promise<{ keypair: Keypair, account: any }>}
+ * @returns {Promise<{ keypair: Keypair, accountResponse: any }>}
  */
 async function initializeKeeperAccount() {
     const secret = process.env.KEEPER_SECRET;
     if (!secret) {
-        throw new Error('KEEPER_SECRET environment  variable is not defined');
+        throw new Error('KEEPER_SECRET environment variable is not defined');
     }
 
     let keypair;
@@ -71,7 +72,15 @@ function getKeeperAccount(accountResponse) {
     return new Account(accountResponse.accountId(), accountResponse.sequenceNumber());
 }
 
+/**
+ * Legacy compatibility with loadAccount from main
+ */
+function loadAccount(config) {
+    return Keypair.fromSecret(config.keeperSecret);
+}
+
 module.exports = {
     initializeKeeperAccount,
-    getKeeperAccount
+    getKeeperAccount,
+    loadAccount
 };

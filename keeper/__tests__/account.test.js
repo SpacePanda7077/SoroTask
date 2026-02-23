@@ -1,14 +1,16 @@
 const { initializeKeeperAccount } = require('../src/account');
-const { Server, Keypair } = require('soroban-client');
+const { rpc, Keypair } = require('@stellar/stellar-sdk');
+const { Server } = rpc;
 
-jest.mock('soroban-client', () => {
-    const original = jest.requireActual('soroban-client');
+jest.mock('@stellar/stellar-sdk', () => {
     return {
-        ...original,
-        Server: jest.fn(),
+        rpc: {
+            Server: jest.fn()
+        },
         Keypair: {
             fromSecret: jest.fn()
-        }
+        },
+        Account: jest.fn()
     };
 });
 
