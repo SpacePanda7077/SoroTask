@@ -1,8 +1,13 @@
-import fetch from "node-fetch";
+const nodeFetch = require("node-fetch");
 
-export class GasMonitor {
+class GasMonitor {
   constructor(logger) {
-    this.logger = logger;
+    // Use console as default logger if none provided
+    this.logger = logger || {
+      info: console.log.bind(console),
+      warn: console.warn.bind(console),
+      error: console.error.bind(console)
+    };
 
     this.GAS_WARN_THRESHOLD =
       parseInt(process.env.GAS_WARN_THRESHOLD, 10) || 500;
@@ -32,15 +37,9 @@ export class GasMonitor {
     }
 
     if (gasBalance <= 0) {
-      this.logger.error("Critical gas balance", {
-        taskId,
-        gasBalance,
-      });
+      this.logger.error(`Task ${taskId} has critically low gas balance (${gasBalance}). Skipping execution.`);
     } else if (isLowGas) {
-      this.logger.info("Low gas balance", {
-        taskId,
-        gasBalance,
-      });
+      this.logger.warn(`Task ${taskId} has low gas balance (${gasBalance}). Threshold: ${this.GAS_WARN_THRESHOLD}`);
     }
 
     if (this.ALERT_WEBHOOK_URL && (gasBalance <= 0 || isLowGas)) {
@@ -64,7 +63,7 @@ export class GasMonitor {
         timestamp: new Date().toISOString(),
       };
 
-      const res = await fetch(this.ALERT_WEBHOOK_URL, {
+      const res = await nodeFetch(this.ALERT_WEBHOOK_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -73,21 +72,13 @@ export class GasMonitor {
       });
 
       if (res.ok) {
-        this.logger.info("Webhook alert sent", {
-          taskId,
-        });
+        this.logger.info(`Webhook alert sent for task ${taskId}`);
         this.lastAlertTimestamps.set(taskId, now);
       } else {
-        this.logger.error("Webhook failed", {
-          taskId,
-          status: res.status,
-        });
+        this.logger.error(`Webhook failed for task ${taskId} with status ${res.status}`);
       }
     } catch (err) {
-      this.logger.error("Webhook error", {
-        taskId,
-        error: err.message,
-      });
+      this.logger.error(`Error sending webhook alert for task ${taskId}:`, err.message);
     }
   }
 
@@ -103,3 +94,5 @@ export class GasMonitor {
     };
   }
 }
+
+module.exports = { GasMonitor };

@@ -59,7 +59,7 @@ describe('TaskPoller', () => {
 
         it('should check all provided task IDs', async () => {
             const taskIds = [1, 2, 3];
-            
+
             // Mock checkTask to return not due
             jest.spyOn(poller, 'checkTask').mockResolvedValue({
                 isDue: false,
@@ -74,7 +74,7 @@ describe('TaskPoller', () => {
 
         it('should return due task IDs', async () => {
             const taskIds = [1, 2, 3];
-            
+
             jest.spyOn(poller, 'checkTask')
                 .mockResolvedValueOnce({ isDue: true, taskId: 1 })
                 .mockResolvedValueOnce({ isDue: false, taskId: 2 })
@@ -88,7 +88,7 @@ describe('TaskPoller', () => {
 
         it('should count skipped tasks', async () => {
             const taskIds = [1, 2];
-            
+
             jest.spyOn(poller, 'checkTask')
                 .mockResolvedValueOnce({ isDue: false, taskId: 1, reason: 'skipped' })
                 .mockResolvedValueOnce({ isDue: true, taskId: 2 });
@@ -101,7 +101,7 @@ describe('TaskPoller', () => {
 
         it('should handle errors gracefully', async () => {
             const taskIds = [1, 2];
-            
+
             jest.spyOn(poller, 'checkTask')
                 .mockRejectedValueOnce(new Error('Network error'))
                 .mockResolvedValueOnce({ isDue: true, taskId: 2 });
@@ -214,9 +214,9 @@ describe('TaskPoller', () => {
         it('should return a copy of stats', () => {
             poller.stats.tasksChecked = 5;
             const stats = poller.getStats();
-            
+
             expect(stats.tasksChecked).toBe(5);
-            
+
             // Verify it's a copy
             stats.tasksChecked = 10;
             expect(poller.stats.tasksChecked).toBe(5);
@@ -225,17 +225,17 @@ describe('TaskPoller', () => {
 
     describe('decodeTaskConfig', () => {
         it('should return null for void ScVal', () => {
-            const { xdr } = require('soroban-client');
+            const { xdr } = require('@stellar/stellar-sdk');
             const voidVal = xdr.ScVal.scvVoid();
-            
+
             const result = poller.decodeTaskConfig(voidVal);
             expect(result).toBeNull();
         });
 
         it('should return null for empty vec', () => {
-            const { xdr } = require('soroban-client');
+            const { xdr } = require('@stellar/stellar-sdk');
             const emptyVec = xdr.ScVal.scvVec([]);
-            
+
             const result = poller.decodeTaskConfig(emptyVec);
             expect(result).toBeNull();
         });

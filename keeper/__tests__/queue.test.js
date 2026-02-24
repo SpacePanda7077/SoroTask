@@ -1,4 +1,4 @@
-const ExecutionQueue = require('../src/queue');
+const { ExecutionQueue } = require('../src/queue');
 
 describe('ExecutionQueue', () => {
     let queue;
@@ -26,7 +26,7 @@ describe('ExecutionQueue', () => {
 
             // Simulate task execution
             await new Promise(res => setTimeout(res, 50));
-            
+
             concurrentExecutions--;
         };
 
@@ -74,7 +74,7 @@ describe('ExecutionQueue', () => {
 
     it('should drain in-flight tasks securely', async () => {
         let task2Started = false;
-        
+
         const fakeExecutor = async (taskId) => {
             if (taskId === 't2') {
                 task2Started = true;
@@ -84,23 +84,23 @@ describe('ExecutionQueue', () => {
 
         // Queue 4 tasks with limit 2
         const p = queue.enqueue(['t1', 't2', 't3', 't4'], fakeExecutor);
-        
+
         // Wait briefly so t1 and t2 start, but before they finish
         await new Promise(res => setTimeout(res, 30));
-        
+
         expect(queue.limit.activeCount).toBe(2);
         expect(queue.limit.pendingCount).toBe(2);
-        
+
         await queue.drain();
 
         // Drain clears pending count (t3 and t4 should be canceled/never executed)
         expect(queue.limit.pendingCount).toBe(0);
-        
+
         // At this point p has t1 and t2 running, but t3 and t4 are canceled and won't resolve. 
         // We only wait for the active promises in queue that we know run, or use queue.drain() to wait instead of 'p'.
         // Since we already awaited queue.drain(), t1 and t2 have completed!
         // So we don't await `p` since it will indefinitely hang due to unresolved cancelled tasks from pLimit.
-        
+
         expect(task2Started).toBe(true);
     });
 });

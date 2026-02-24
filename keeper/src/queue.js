@@ -1,7 +1,7 @@
-import EventEmitter from "events";
-import pLimit from "p-limit";
+const EventEmitter = require("events");
+const pLimit = require("p-limit");
 
-export class ExecutionQueue extends EventEmitter {
+class ExecutionQueue extends EventEmitter {
   constructor(limit, metricsServer) {
     super();
 
@@ -96,3 +96,5 @@ export class ExecutionQueue extends EventEmitter {
     }
   }
 }
+
+module.exports = { ExecutionQueue };

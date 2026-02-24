@@ -1,4 +1,4 @@
-import http from "http";
+const http = require("http");
 
 /**
  * Metrics store for tracking operational statistics.
@@ -76,9 +76,23 @@ class Metrics {
       rpcConnected: this.rpcConnected,
     };
   }
+
+  reset() {
+    this.counters = {
+      tasksCheckedTotal: 0,
+      tasksDueTotal: 0,
+      tasksExecutedTotal: 0,
+      tasksFailedTotal: 0,
+    };
+    this.gauges = {
+      avgFeePaidXlm: 0,
+      lastCycleDurationMs: 0,
+    };
+    this.feeSamples = [];
+  }
 }
 
-export class MetricsServer {
+class MetricsServer {
   constructor(gasMonitor, logger) {
     this.gasMonitor = gasMonitor;
     this.logger = logger;
@@ -162,3 +176,5 @@ export class MetricsServer {
     }
   }
 }
+
+module.exports = { Metrics, MetricsServer };
