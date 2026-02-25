@@ -6,6 +6,7 @@ const { loadConfig } = require('./src/config');
 const { initializeKeeperAccount } = require('./src/account');
 const { ExecutionQueue } = require('./src/queue');
 const TaskPoller = require('./src/poller');
+const TaskRegistry = require('./src/registry');
 
 async function main() {
     console.log("Starting SoroTask Keeper...");
@@ -97,22 +98,11 @@ async function main() {
         }
     };
 
-    // Get task registry - in production, this would query the contract for all registered task IDs
-    const getTaskRegistry = async () => {
-        // Option 1: Use environment variable for known task IDs
-        if (process.env.TASK_IDS) {
-            return process.env.TASK_IDS.split(',').map(id => parseInt(id.trim(), 10));
-        }
-
-        // Option 2: Default range (can be improved by querying events or contract counter)
-        try {
-            const maxTaskId = parseInt(process.env.MAX_TASK_ID || 10, 10);
-            return Array.from({ length: maxTaskId }, (_, i) => i + 1);
-        } catch (error) {
-            console.warn('[Registry] Could not determine task range');
-            return [];
-        }
-    };
+    // Initialize event-driven task registry
+    const registry = new TaskRegistry(server, config.contractId, {
+        startLedger: parseInt(process.env.START_LEDGER || '0', 10)
+    });
+    await registry.init();
 
     // Polling loop
     const pollingIntervalMs = config.pollIntervalMs;
@@ -122,8 +112,11 @@ async function main() {
         try {
             console.log('\n[Keeper] ===== Starting new polling cycle =====');
 
+            // Poll for new TaskRegistered events
+            await registry.poll();
+
             // Get list of all registered task IDs
-            const taskIds = await getTaskRegistry();
+            const taskIds = registry.getTaskIds();
             console.log(`[Keeper] Checking ${taskIds.length} tasks...`);
 
             // Poll for due tasks
@@ -159,7 +152,7 @@ async function main() {
     console.log('[Keeper] Running initial poll...');
     setTimeout(async () => {
         try {
-            const taskIds = await getTaskRegistry();
+            const taskIds = registry.getTaskIds();
             const dueTaskIds = await poller.pollDueTasks(taskIds);
             if (dueTaskIds.length > 0) {
                 await queue.enqueue(dueTaskIds, executeTask);
