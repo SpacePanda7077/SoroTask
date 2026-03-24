@@ -1,5 +1,9 @@
 const { Keypair, rpc, Account } = require('@stellar/stellar-sdk');
 const { Server } = rpc;
+const { createLogger } = require('./logger');
+
+// Create logger for account module
+const logger = createLogger('account');
 
 /**
  * Loads the keeper's keypair and validates its on-chain state.
@@ -24,7 +28,7 @@ async function initializeKeeperAccount() {
     }
 
     const publicKey = keypair.publicKey();
-    console.log(`Keeper initialized with public key: ${publicKey}`);
+    logger.info('Keeper initialized', { publicKey });
 
     const rpcUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
     const server = new Server(rpcUrl);
@@ -56,7 +60,7 @@ async function initializeKeeperAccount() {
         if (haltOnLowBalance) {
             throw new Error(`HALTING: ${warning}`);
         } else {
-            console.warn(`WARNING: ${warning}`);
+            logger.warn('Low balance warning', { balanceXlm, minBalanceXlm });
         }
     }
 

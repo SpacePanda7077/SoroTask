@@ -7,17 +7,23 @@ const { initializeKeeperAccount } = require('./src/account');
 const { ExecutionQueue } = require('./src/queue');
 const TaskPoller = require('./src/poller');
 const TaskRegistry = require('./src/registry');
+const { createLogger } = require('./src/logger');
+
+// Create root logger for the main module
+const logger = createLogger('keeper');
 
 async function main() {
-    console.log("Starting SoroTask Keeper...");
+    logger.info('Starting SoroTask Keeper');
 
     let config;
     try {
         config = loadConfig();
-        console.log(`Configured for network: ${config.networkPassphrase}`);
-        console.log(`RPC URL: ${config.rpcUrl}`);
+        logger.info('Configuration loaded', { 
+            network: config.networkPassphrase,
+            rpcUrl: config.rpcUrl 
+        });
     } catch (err) {
-        console.error(`Configuration error: ${err.message}`);
+        logger.error('Configuration error', { error: err.message });
         process.exit(1);
     }
 
@@ -25,26 +31,28 @@ async function main() {
     try {
         keeperData = await initializeKeeperAccount();
     } catch (err) {
-        console.error(`Failed to initialize keeper: ${err.message}`);
+        logger.error('Failed to initialize keeper', { error: err.message });
         process.exit(1);
     }
 
     const { keypair, accountResponse } = keeperData;
     const server = new Server(config.rpcUrl);
 
-    // Initialize polling engine
+    // Initialize polling engine with logger
     const poller = new TaskPoller(server, config.contractId, {
-        maxConcurrentReads: process.env.MAX_CONCURRENT_READS
+        maxConcurrentReads: process.env.MAX_CONCURRENT_READS,
+        logger: createLogger('poller')
     });
-    console.log(`Poller initialized for contract: ${config.contractId}`);
+    logger.info('Poller initialized', { contractId: config.contractId });
 
     // Initialize execution queue
     const queue = new ExecutionQueue();
+    const queueLogger = createLogger('queue');
 
-    queue.on('task:started', (taskId) => console.log(`[Queue] Started execution for task ${taskId}`));
-    queue.on('task:success', (taskId) => console.log(`[Queue] Task ${taskId} executed successfully`));
-    queue.on('task:failed', (taskId, err) => console.error(`[Queue] Task ${taskId} failed:`, err.message));
-    queue.on('cycle:complete', (stats) => console.log(`[Queue] Cycle complete: ${JSON.stringify(stats)}`));
+    queue.on('task:started', (taskId) => queueLogger.info('Started execution', { taskId }));
+    queue.on('task:success', (taskId) => queueLogger.info('Task executed successfully', { taskId }));
+    queue.on('task:failed', (taskId, err) => queueLogger.error('Task failed', { taskId, error: err.message }));
+    queue.on('cycle:complete', (stats) => queueLogger.info('Cycle complete', stats));
 
     // Task executor function - calls contract.execute(keeper, task_id)
     const executeTask = async (taskId) => {
@@ -71,7 +79,7 @@ async function main() {
 
             // Submit the transaction
             const response = await server.sendTransaction(transaction);
-            console.log(`[Executor] Task ${taskId} transaction submitted: ${response.hash}`);
+            logger.info('Task transaction submitted', { taskId, hash: response.hash });
 
             // Wait for confirmation (optional, can be made configurable)
             if (process.env.WAIT_FOR_CONFIRMATION !== 'false') {
@@ -86,62 +94,63 @@ async function main() {
                 }
 
                 if (status.status === 'SUCCESS') {
-                    console.log(`[Executor] Task ${taskId} executed successfully`);
+                    logger.info('Task executed successfully', { taskId });
                 } else {
                     throw new Error(`Transaction failed with status: ${status.status}`);
                 }
             }
 
         } catch (error) {
-            console.error(`[Executor] Failed to execute task ${taskId}:`, error.message);
+            logger.error('Failed to execute task', { taskId, error: error.message });
             throw error;
         }
     };
 
     // Initialize event-driven task registry
     const registry = new TaskRegistry(server, config.contractId, {
-        startLedger: parseInt(process.env.START_LEDGER || '0', 10)
+        startLedger: parseInt(process.env.START_LEDGER || '0', 10),
+        logger: createLogger('registry')
     });
     await registry.init();
 
     // Polling loop
     const pollingIntervalMs = config.pollIntervalMs;
-    console.log(`Starting polling loop with interval: ${pollingIntervalMs}ms`);
+    logger.info('Starting polling loop', { intervalMs: pollingIntervalMs });
 
     const pollingInterval = setInterval(async () => {
         try {
-            console.log('\n[Keeper] ===== Starting new polling cycle =====');
+            logger.info('Starting new polling cycle');
 
             // Poll for new TaskRegistered events
             await registry.poll();
 
             // Get list of all registered task IDs
             const taskIds = registry.getTaskIds();
-            console.log(`[Keeper] Checking ${taskIds.length} tasks...`);
+            logger.info('Checking tasks', { taskCount: taskIds.length });
 
             // Poll for due tasks
             const dueTaskIds = await poller.pollDueTasks(taskIds);
 
             if (dueTaskIds.length > 0) {
-                console.log(`[Keeper] Found ${dueTaskIds.length} due tasks, enqueueing for execution...`);
+                logger.info('Found due tasks, enqueueing for execution', { dueCount: dueTaskIds.length });
                 await queue.enqueue(dueTaskIds, executeTask);
             } else {
-                console.log('[Keeper] No tasks due for execution');
+                logger.info('No tasks due for execution');
             }
 
-            console.log('[Keeper] ===== Polling cycle complete =====\n');
+            logger.info('Polling cycle complete');
 
         } catch (error) {
-            console.error('[Keeper] Error in polling cycle:', error);
+            logger.error('Error in polling cycle', { error: error.message });
         }
     }, pollingIntervalMs);
 
     // Graceful shutdown handling
     const shutdown = async (signal) => {
-        console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+        logger.info('Received shutdown signal, starting graceful shutdown', { signal });
         clearInterval(pollingInterval);
         await queue.drain();
-        console.log("Graceful shutdown complete. Exiting.");
+        logger.info('Graceful shutdown complete, exiting');
         process.exit(0);
     };
 
@@ -149,7 +158,7 @@ async function main() {
     process.on('SIGINT', () => shutdown('SIGINT'));
 
     // Run first poll immediately
-    console.log('[Keeper] Running initial poll...');
+    logger.info('Running initial poll');
     setTimeout(async () => {
         try {
             const taskIds = registry.getTaskIds();
@@ -158,12 +167,12 @@ async function main() {
                 await queue.enqueue(dueTaskIds, executeTask);
             }
         } catch (error) {
-            console.error('[Keeper] Error in initial poll:', error);
+            logger.error('Error in initial poll', { error: error.message });
         }
     }, 1000);
 }
 
 main().catch((err) => {
-    console.error("Fatal Keeper Error:", err);
+    logger.fatal('Fatal Keeper Error', { error: err.message, stack: err.stack });
     process.exit(1);
 });

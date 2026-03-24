@@ -1,4 +1,5 @@
-import { withRetry, ErrorClassification } from "./retry.js";
+const { withRetry, ErrorClassification } = require('./retry.js');
+const { createLogger } = require('./logger.js');
 
 /**
  * Create an executor for task execution with retry logic
@@ -7,14 +8,16 @@ import { withRetry, ErrorClassification } from "./retry.js";
  * @param {Object} deps.config - Configuration object with retry settings
  * @returns {Object} - Executor instance
  */
-export function createExecutor({ logger, config }) {
+function createExecutor({ logger, config }) {
+  // Use provided logger or create default
+  const executorLogger = logger || createLogger('executor');
   return {
     async execute(task) {
       const retryCount = { value: 0 };
 
       const result = await withRetry(
         async () => {
-          logger.info("Executing task", { task, attempt: retryCount.value + 1 });
+          executorLogger.info("Executing task", { task, attempt: retryCount.value + 1 });
           // TODO: build and submit Soroban transaction
           // For now, this is a placeholder that will be replaced with actual implementation
           return { taskId: task.id, status: "executed" };
@@ -25,7 +28,7 @@ export function createExecutor({ logger, config }) {
           maxDelayMs: config?.maxRetryDelayMs || 30000,
           onRetry: (error, attempt, delay) => {
             retryCount.value = attempt;
-            logger.info("Retrying task execution", {
+            executorLogger.info("Retrying task execution", {
               taskId: task.id,
               attempt,
               delay,
@@ -33,14 +36,14 @@ export function createExecutor({ logger, config }) {
             });
           },
           onMaxRetries: (error, attempts) => {
-            logger.warn("MAX_RETRIES_EXCEEDED", {
+            executorLogger.warn("MAX_RETRIES_EXCEEDED", {
               taskId: task.id,
               attempts,
               error: error.message || error.code,
             });
           },
           onDuplicate: () => {
-            logger.info("Transaction already accepted (duplicate)", {
+            executorLogger.info("Transaction already accepted (duplicate)", {
               taskId: task.id,
             });
           },
@@ -49,7 +52,7 @@ export function createExecutor({ logger, config }) {
 
       // Log execution result with retry count
       if (result.success) {
-        logger.info("Task execution completed", {
+        executorLogger.info("Task execution completed", {
           taskId: task.id,
           attempts: result.attempts,
           retries: result.retries,
@@ -63,4 +66,4 @@ export function createExecutor({ logger, config }) {
 }
 
 // Re-export error classification for consumers
-export { ErrorClassification };
+module.exports = { createExecutor, ErrorClassification };

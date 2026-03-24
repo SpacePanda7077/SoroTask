@@ -1,5 +1,6 @@
 const pLimit = require('p-limit');
 const { Contract, xdr, TransactionBuilder, BASE_FEE, Networks, scValToNative } = require('@stellar/stellar-sdk');
+const { createLogger } = require('./logger');
 
 /**
  * Production-grade polling engine for SoroTask Keeper.
@@ -10,6 +11,9 @@ class TaskPoller {
     constructor(server, contractId, options = {}) {
         this.server = server;
         this.contractId = contractId;
+
+        // Structured logger for poller module
+        this.logger = options.logger || createLogger('poller');
 
         // Configuration with defaults
         this.maxConcurrentReads = parseInt(
@@ -46,7 +50,7 @@ class TaskPoller {
         this.stats.errors = 0;
 
         if (!taskIds || taskIds.length === 0) {
-            console.log('[Poller] No tasks to check');
+            this.logger.info('No tasks to check');
             return [];
         }
 
@@ -57,7 +61,7 @@ class TaskPoller {
 
             // Note: In production, you'd want to use the actual ledger timestamp
             // which might require additional RPC calls or using ledger.timestamp from contract context
-            console.log(`[Poller] Current ledger sequence: ${currentTimestamp}`);
+            this.logger.info('Current ledger sequence', { sequence: currentTimestamp });
 
             // Process tasks in parallel with concurrency control
             const taskChecks = taskIds.map(taskId =>
@@ -83,7 +87,7 @@ class TaskPoller {
                     this.stats.tasksChecked++;
                 } else if (result.status === 'rejected') {
                     this.stats.errors++;
-                    console.error(`[Poller] Error checking task ${taskIds[index]}:`, result.reason);
+                    this.logger.error('Error checking task', { taskId: taskIds[index], error: result.reason?.message || result.reason });
                 }
             });
 
@@ -93,7 +97,7 @@ class TaskPoller {
             return dueTaskIds;
 
         } catch (error) {
-            console.error('[Poller] Fatal error during polling cycle:', error);
+            this.logger.error('Fatal error during polling cycle', { error: error.message, stack: error.stack });
             this.stats.errors++;
             return [];
         }
@@ -112,13 +116,13 @@ class TaskPoller {
             const taskConfig = await this.getTaskConfig(taskId);
 
             if (!taskConfig) {
-                console.warn(`[Poller] Task ${taskId} not found (may have been deregistered)`);
+                this.logger.warn('Task not found (may have been deregistered)', { taskId });
                 return { isDue: false, taskId, reason: 'not_found' };
             }
 
             // Check gas balance
             if (taskConfig.gas_balance <= 0) {
-                console.warn(`[Poller] Task ${taskId} has insufficient gas balance: ${taskConfig.gas_balance}`);
+                this.logger.warn('Task has insufficient gas balance', { taskId, gasBalance: taskConfig.gas_balance });
                 return { isDue: false, taskId, reason: 'skipped' };
             }
 
@@ -127,17 +131,19 @@ class TaskPoller {
             const isDue = nextRunTime <= currentTimestamp;
 
             if (isDue) {
-                console.log(
-                    `[Poller] Task ${taskId} is DUE ` +
-                    `(last_run: ${taskConfig.last_run}, interval: ${taskConfig.interval}, ` +
-                    `next_run: ${nextRunTime}, current: ${currentTimestamp})`
-                );
+                this.logger.info('Task is due', {
+                    taskId,
+                    lastRun: taskConfig.last_run,
+                    interval: taskConfig.interval,
+                    nextRun: nextRunTime,
+                    current: currentTimestamp
+                });
             }
 
             return { isDue, taskId };
 
         } catch (error) {
-            console.error(`[Poller] Error checking task ${taskId}:`, error.message);
+            this.logger.error('Error checking task', { taskId, error: error.message });
             throw error;
         }
     }
@@ -224,7 +230,7 @@ class TaskPoller {
 
             // TaskConfig is a struct (scvMap)
             if (taskVal.switch().name !== 'scvMap') {
-                console.warn('[Poller] Unexpected ScVal type for TaskConfig:', taskVal.switch().name);
+                this.logger.warn('Unexpected ScVal type for TaskConfig', { type: taskVal.switch().name });
                 return null;
             }
 
@@ -270,7 +276,7 @@ class TaskPoller {
             return config;
 
         } catch (error) {
-            console.error('[Poller] Error decoding TaskConfig XDR:', error);
+            this.logger.error('Error decoding TaskConfig XDR', { error: error.message });
             return null;
         }
     }
@@ -281,13 +287,13 @@ class TaskPoller {
      * @param {number} duration - Duration of the poll in milliseconds
      */
     logPollSummary(duration) {
-        console.log(
-            `[Poller] Poll complete in ${duration}ms | ` +
-            `Checked: ${this.stats.tasksChecked} | ` +
-            `Due: ${this.stats.tasksDue} | ` +
-            `Skipped: ${this.stats.tasksSkipped} | ` +
-            `Errors: ${this.stats.errors}`
-        );
+        this.logger.info('Poll complete', {
+            durationMs: duration,
+            checked: this.stats.tasksChecked,
+            due: this.stats.tasksDue,
+            skipped: this.stats.tasksSkipped,
+            errors: this.stats.errors
+        });
     }
 
     /**
