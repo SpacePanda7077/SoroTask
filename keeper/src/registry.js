@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { xdr } = require('@stellar/stellar-sdk');
+const { createLogger } = require('./logger');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
@@ -11,6 +12,7 @@ class TaskRegistry {
         this.contractId = contractId;
         this.taskIds = new Set();
         this.lastSeenLedger = options.startLedger || 0;
+        this.logger = options.logger || createLogger('registry');
         this._ensureDataDir();
         this._loadFromDisk();
     }
@@ -20,9 +22,9 @@ class TaskRegistry {
      * historical events we may have missed since the last run.
      */
     async init() {
-        console.log('[Registry] Initializing task registry...');
+        this.logger.info('Initializing task registry');
         await this._fetchEvents();
-        console.log(`[Registry] Initialized with ${this.taskIds.size} task(s)`);
+        this.logger.info('Registry initialized', { taskCount: this.taskIds.size });
     }
 
     /**
@@ -90,10 +92,10 @@ class TaskRegistry {
                         const taskId = this._extractTaskId(event);
                         if (taskId !== null && !this.taskIds.has(taskId)) {
                             this.taskIds.add(taskId);
-                            console.log(`[Registry] Discovered task ID: ${taskId}`);
+                            this.logger.info('Discovered task ID', { taskId });
                         }
                     } catch (err) {
-                        console.warn(`[Registry] Failed to decode event: ${err.message}`);
+                        this.logger.warn('Failed to decode event', { error: err.message });
                     }
 
                     // Track the latest ledger we've processed
@@ -113,7 +115,7 @@ class TaskRegistry {
             this._saveToDisk();
         } catch (err) {
             // Don't crash on transient RPC errors — just log and keep going
-            console.error(`[Registry] Error fetching events: ${err.message}`);
+            this.logger.error('Error fetching events', { error: err.message });
         }
     }
 
@@ -156,10 +158,10 @@ class TaskRegistry {
                 if (data.lastSeenLedger && data.lastSeenLedger > this.lastSeenLedger) {
                     this.lastSeenLedger = data.lastSeenLedger;
                 }
-                console.log(`[Registry] Loaded ${this.taskIds.size} task(s) from disk (ledger: ${this.lastSeenLedger})`);
+                this.logger.info('Loaded tasks from disk', { taskCount: this.taskIds.size, ledger: this.lastSeenLedger });
             }
         } catch (err) {
-            console.warn(`[Registry] Could not load persisted tasks: ${err.message}`);
+            this.logger.warn('Could not load persisted tasks', { error: err.message });
         }
     }
 
@@ -172,7 +174,7 @@ class TaskRegistry {
             };
             fs.writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2));
         } catch (err) {
-            console.warn(`[Registry] Could not persist tasks: ${err.message}`);
+            this.logger.warn('Could not persist tasks', { error: err.message });
         }
     }
 }

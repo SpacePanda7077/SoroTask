@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    name: Build and Release Wasm Artifact
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./contract
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo Registry & Build Artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./contract -> target"
+
+      - name: Build Release Wasm
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Calculate SHA256 Hash
+        id: sha256
+        run: |
+          WASM_PATH="target/wasm32-unknown-unknown/release/soro_task.wasm"
+          if [ ! -f "$WASM_PATH" ]; then
+            echo "Error: Wasm artifact not found at $WASM_PATH"
+            exit 1
+          fi
+          SHA256_HASH=$(sha256sum "$WASM_PATH" | awk '{ print $1 }')
+          echo "sha256=$SHA256_HASH" >> $GITHUB_OUTPUT
+          echo "Wasm SHA256: $SHA256_HASH"
+          echo ""
+          echo "--- Artifact Details ---"
+          echo "File: soro_task.wasm"
+          echo "Size: $(stat -c%s "$WASM_PATH") bytes"
+          echo "SHA256: $SHA256_HASH"
+          echo "------------------------"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            contract/target/wasm32-unknown-unknown/release/soro_task.wasm
+          body: |
+            ## SoroTask Contract Release
+            
+            **Version:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            
+            ### Artifact
+            - **File:** `soro_task.wasm`
+            - **SHA256:** `${{ steps.sha256.outputs.sha256 }}`
+            
+            ### Verification
+            Verify the artifact checksum:
+            ```bash
+            sha256sum soro_task.wasm
+            ```
+            
+            Expected output should match:
+            ```
+            ${{ steps.sha256.outputs.sha256 }}  soro_task.wasm
+            ```
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print Release Summary
+        run: |
+          echo "========================================"
+          echo "Release ${{ github.ref_name }} created successfully!"
+          echo "========================================"
+          echo "Artifact: soro_task.wasm"
+          echo "SHA256: ${{ steps.sha256.outputs.sha256 }}"
+          echo "========================================"

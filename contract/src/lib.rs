@@ -12,6 +12,9 @@ pub enum Error {
     Unauthorized = 2,
     InsufficientBalance = 3,
     NotInitialized = 4,
+    TaskPaused = 5,
+    TaskAlreadyPaused = 6,
+    TaskAlreadyActive = 7,
 }
 
 #[contracttype]
@@ -26,6 +29,7 @@ pub struct TaskConfig {
     pub last_run: u64,
     pub gas_balance: i128,
     pub whitelist: Vec<Address>,
+    pub is_active: bool,
 }
 
 #[contracttype]
@@ -33,6 +37,15 @@ pub enum DataKey {
     Task(u64),
     Counter,
     Token,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ExecutableTask {
+    pub task_id: u64,
+    pub target: Address,
+    pub function: Symbol,
+    pub args: Vec<Val>,
 }
 
 pub trait ResolverInterface {
@@ -46,7 +59,7 @@ pub struct SoroTaskContract;
 impl SoroTaskContract {
     /// Registers a new task in the marketplace.
     /// Returns the unique sequential ID of the registered task.
-    pub fn register(env: Env, config: TaskConfig) -> u64 {
+    pub fn register(env: Env, mut config: TaskConfig) -> u64 {
         // Ensure the creator has authorized the registration
         config.creator.require_auth();
 
@@ -55,6 +68,7 @@ impl SoroTaskContract {
             panic_with_error!(&env, Error::InvalidInterval);
         }
 
+        config.is_active = true;
         // Generate a unique sequential ID
         let mut counter: u64 = env
             .storage()
@@ -83,10 +97,114 @@ impl SoroTaskContract {
         env.storage().persistent().get(&DataKey::Task(task_id))
     }
 
-    pub fn monitor(_env: Env) {
-        // TODO: Implement task monitoring logic
+    pub fn monitor(env: Env) -> Vec<ExecutableTask> {
+        let now = env.ledger().timestamp();
+        let counter: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Counter)
+            .unwrap_or(0);
+
+        let mut executable = Vec::new(&env);
+
+        for task_id in 1..=counter {
+            let maybe_config: Option<TaskConfig> =
+                env.storage().persistent().get(&DataKey::Task(task_id));
+
+            if let Some(config) = maybe_config {
+                // Check interval
+                if now >= config.last_run + config.interval {
+                    executable.push_back(ExecutableTask {
+                        task_id,
+                        target: config.target,
+                        function: config.function,
+                        args: config.args,
+                    });
+                }
+            }
+        }
+
+        executable
     }
 
+    pub fn pause_task(env: Env, task_id: u64) {
+        let task_key = DataKey::Task(task_id);
+        let mut config: TaskConfig = env
+            .storage()
+            .persistent()
+            .get(&task_key)
+            .expect("Task not found");
+
+        config.creator.require_auth();
+
+        if !config.is_active {
+            panic_with_error!(&env, Error::TaskAlreadyPaused);
+        }
+
+        config.is_active = false;
+        env.storage().persistent().set(&task_key, &config);
+
+        env.events().publish(
+            (Symbol::new(&env, "TaskPaused"), task_id),
+            config.creator.clone(),
+        );
+    }
+
+    pub fn resume_task(env: Env, task_id: u64) {
+        let task_key = DataKey::Task(task_id);
+        let mut config: TaskConfig = env
+            .storage()
+            .persistent()
+            .get(&task_key)
+            .expect("Task not found");
+
+        config.creator.require_auth();
+
+        if config.is_active {
+            panic_with_error!(&env, Error::TaskAlreadyActive);
+        }
+
+        config.is_active = true;
+        env.storage().persistent().set(&task_key, &config);
+
+        env.events().publish(
+            (Symbol::new(&env, "TaskResumed"), task_id),
+            config.creator.clone(),
+        );
+    pub fn monitor_paginated(env: Env, start_id: u64, limit: u64) -> Vec<ExecutableTask> {
+        let now = env.ledger().timestamp();
+        let counter: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Counter)
+            .unwrap_or(0);
+
+        // Clamp start to valid range
+        if start_id == 0 || start_id > counter {
+            return Vec::new(&env);
+        }
+
+        let end_id = (start_id + limit - 1).min(counter);
+        let mut executable = Vec::new(&env);
+
+        for task_id in start_id..=end_id {
+            let maybe_config: Option<TaskConfig> =
+                env.storage().persistent().get(&DataKey::Task(task_id));
+
+            if let Some(config) = maybe_config {
+                if now >= config.last_run + config.interval {
+                    executable.push_back(ExecutableTask {
+                        task_id,
+                        target: config.target,
+                        function: config.function,
+                        args: config.args,
+                    });
+                }
+            }
+        }
+
+        executable
+    }
     /// Executes a registered task identified by `task_id`.
     ///
     /// # Flow
@@ -114,6 +232,10 @@ impl SoroTaskContract {
             .persistent()
             .get(&task_key)
             .expect("Task not found");
+
+        if !config.is_active {
+            panic_with_error!(&env, Error::TaskPaused);
+        }
 
         if !config.whitelist.is_empty() && !config.whitelist.contains(&keeper) {
             panic_with_error!(&env, Error::Unauthorized);
@@ -374,6 +496,39 @@ mod tests {
         env.ledger().with_mut(|l| l.timestamp = ts);
     }
 
+    #[allow(dead_code)]
+    pub fn update_task(env: Env, task_id: u64, new_config: TaskConfig) {
+        let task_key = DataKey::Task(task_id);
+
+        let existing: TaskConfig = env
+            .storage()
+            .persistent()
+            .get(&task_key)
+            .expect("Task not found");
+
+        // Only original creator can update
+        existing.creator.require_auth();
+
+        // Validate interval
+        if new_config.interval == 0 {
+            panic_with_error!(&env, Error::InvalidInterval);
+        }
+
+        // Preserve fields that must not change
+        let updated = TaskConfig {
+            creator: existing.creator,         // lock — cannot transfer ownership
+            gas_balance: existing.gas_balance, // lock — use deposit/withdraw
+            last_run: existing.last_run,       // lock — would break interval logic
+            ..new_config
+        };
+
+        env.storage().persistent().set(&task_key, &updated);
+
+        env.events().publish(
+            (Symbol::new(&env, "TaskUpdated"), task_id),
+            updated.creator.clone(),
+        );
+    }
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// Registering a task stores it; get_task retrieves identical data.

@@ -1,13 +1,10 @@
 const nodeFetch = require("node-fetch");
+const { createLogger } = require('./logger');
 
 class GasMonitor {
   constructor(logger) {
-    // Use console as default logger if none provided
-    this.logger = logger || {
-      info: console.log.bind(console),
-      warn: console.warn.bind(console),
-      error: console.error.bind(console)
-    };
+    // Use structured logger if none provided
+    this.logger = logger || createLogger('gasMonitor');
 
     this.GAS_WARN_THRESHOLD =
       parseInt(process.env.GAS_WARN_THRESHOLD, 10) || 500;

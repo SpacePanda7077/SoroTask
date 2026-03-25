@@ -26,5 +26,12 @@ export function loadConfig() {
     contractId: process.env.CONTRACT_ID,
     pollIntervalMs:
       parseInt(process.env.POLLING_INTERVAL_MS, 10) || 10000,
+    // Retry configuration
+    maxRetries: parseInt(process.env.MAX_RETRIES, 10) || 3,
+    retryBaseDelayMs: parseInt(process.env.RETRY_BASE_DELAY_MS, 10) || 1000,
+    maxRetryDelayMs: parseInt(process.env.MAX_RETRY_DELAY_MS, 10) || 30000,
+    // Logging configuration
+    logLevel: process.env.LOG_LEVEL || 'info',
+    nodeEnv: process.env.NODE_ENV || 'production',
   };
 }
