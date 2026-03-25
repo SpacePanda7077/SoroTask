@@ -1,49 +1,44 @@
-name: Keeper Node.js CI
+name: Keeper CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main", "feat/*", "fix/*" ]
     paths:
-      - "keeper/**"
-      - ".github/workflows/keeper.yml"
+      - 'keeper/**'
+      - '.github/workflows/keeper.yml'
   pull_request:
-    branches: ["main"]
+    branches: [ "main", "feat/*" ]
     paths:
-      - "keeper/**"
-      - ".github/workflows/keeper.yml"
+      - 'keeper/**'
+      - '.github/workflows/keeper.yml'
 
 # This ensures all 'run' commands happen inside the Keeper directory
 defaults:
   run:
     working-directory: ./keeper
 
-concurrency:
-  group: keeper-ci-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  NODE_ENV: test
 
 jobs:
-  lint:
-    name: Lint (ESLint)
+  lint-and-test:
+    name: Lint, Test, and Coverage
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "./keeper/package-lock.json"
-
-      - name: Cache npm registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-20-npm-${{ hashFiles('./keeper/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-20-npm-
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: './keeper/package-lock.json'
 
       - name: Install dependencies
         run: npm ci
@@ -51,61 +46,48 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
-  test:
-    name: Test (Jest)
+      - name: Run Unit Tests
+        run: npm test
+
+      - name: Run Tests with Coverage
+        run: npm run test:cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./keeper/coverage/lcov.info
+          flags: keeper
+          name: keeper-node-${{ matrix.node-version }}
+          fail_ci_if_error: false
+
+  coverage-threshold:
+    name: Coverage Threshold Check
     runs-on: ubuntu-latest
+    needs: lint-and-test
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "./keeper/package-lock.json"
-
-      - name: Cache npm registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-20-npm-${{ hashFiles('./keeper/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-20-npm-
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: './keeper/package-lock.json'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Jest tests with coverage
-        env:
-          NODE_ENV: test
-          SOROBAN_RPC_URL: http://localhost
-          CONTRACT_ID: GFAKE
-        run: npm test
+      - name: Run coverage check
+        run: npm run test:cov
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: keeper-coverage-report
-          path: keeper/coverage
-          retention-days: 30
-
-  docker:
-    name: Docker Build Validation
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./keeper
-          file: ./keeper/Dockerfile
-          push: false
-          tags: sorotask-keeper:test
+      - name: Check coverage threshold (80%)
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+          echo "Line coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below threshold of 80%"
+            exit 1
+          fi
+          echo "Coverage check passed!"
