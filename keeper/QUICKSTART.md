@@ -59,7 +59,58 @@ soroban contract deploy \
   --network futurenet
 ```
 
-## Step 3: Start the Keeper
+## Step 3 (Optional): Dry-Run the Keeper
+
+Before spending real XLM, use dry-run mode to verify your configuration and simulate task execution without submitting any transactions.
+
+```bash
+npm run dry-run
+# or directly:
+node index.js --dry-run
+```
+
+In dry-run mode the keeper:
+- Connects to the RPC and loads your account (read-only)
+- Polls for due tasks exactly as it would in live mode
+- **Builds and simulates** each task's `execute()` transaction against the network
+- Logs the simulated fee estimate, task eligibility, and any contract errors
+- **Skips** signing, submitting, and confirmation — nothing is written on-chain
+
+### Sample dry-run output
+
+```
+{"level":30,"module":"keeper","msg":"Starting SoroTask Keeper in DRY-RUN mode — no transactions will be submitted"}
+{"level":30,"module":"keeper","msg":"Configuration loaded","network":"Test SDF Future Network ; October 2022"}
+{"level":30,"module":"dry-run","msg":"Simulating task — no transaction will be submitted","taskId":1}
+{"level":30,"module":"dry-run","msg":"Transaction built","taskId":1,"keeperAddress":"GXXX...","contractId":"CXXX..."}
+{"level":30,"module":"dry-run","msg":"Sending simulation request to RPC","taskId":1}
+{"level":30,"module":"dry-run","msg":"Simulation successful — task is eligible and would execute on-chain","taskId":1,"estimatedFee":12345,"latestLedger":987654}
+{"level":30,"module":"dry-run","msg":"SKIPPING sign, submit, and confirmation (dry-run mode active)","taskId":1}
+{"level":30,"module":"keeper","msg":"Dry-run result","taskId":1,"status":"DRY_RUN_SUCCESS","estimatedFee":12345,"error":null}
+```
+
+### Interpreting dry-run results
+
+| `status` | Meaning |
+|---|---|
+| `DRY_RUN_SUCCESS` | Task is due and the contract call would succeed on-chain |
+| `DRY_RUN_SIM_FAILED` | Task is due but the contract would revert — check the `error` field |
+| `DRY_RUN_ERROR` | Unexpected local error (bad config, RPC unreachable, etc.) |
+
+### Common dry-run issues
+
+**`DRY_RUN_SIM_FAILED` with "TaskPaused" or "TaskAlreadyActive"**
+The task exists but is not eligible for execution right now. This is not a keeper misconfiguration.
+
+**`DRY_RUN_ERROR` with "Account not found"**
+Your `KEEPER_SECRET` points to an unfunded account. Fund it via Friendbot before testing.
+
+**`DRY_RUN_ERROR` with "connect ECONNREFUSED"**
+The `SOROBAN_RPC_URL` is unreachable. Check your `.env` and network.
+
+---
+
+## Step 4: Start the Keeper
 
 ```bash
 npm start
@@ -79,7 +130,7 @@ Starting polling loop with interval: 10000ms
 [Poller] Poll complete in 234ms | Checked: 5 | Due: 2 | Skipped: 1 | Errors: 0
 ```
 
-## Step 4: Monitor Execution
+## Step 5: Monitor Execution
 
 Watch the logs for task execution:
 
@@ -101,7 +152,7 @@ Watch the logs for task execution:
 [Keeper] ===== Polling cycle complete =====
 ```
 
-## Step 5: Graceful Shutdown
+## Step 6: Graceful Shutdown
 
 Press `Ctrl+C` to stop the keeper:
 
