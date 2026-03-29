@@ -1118,6 +1118,8 @@ mod tests {
         assert_eq!(
             soroban_sdk::Symbol::from_val(&env, &event.1.get(0).unwrap()),
             soroban_sdk::Symbol::new(&env, "TaskCancelled")
-        );
     }
 }
+
+#[cfg(test)]
+mod proptest;
