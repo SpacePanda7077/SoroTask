@@ -1,0 +1,30 @@
+[package]
+name = "soro_task_contract-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+soroban-sdk = { version = "25.3.0", features = ["testutils"] }
+
+[dependencies.soro_task_contract]
+path = ".."
+features = ["testutils"]
+
+[[bin]]
+name = "fuzz_register"
+path = "fuzz_targets/fuzz_register.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_execute"
+path = "fuzz_targets/fuzz_execute.rs"
+test = false
+doc = false
+bench = false

@@ -3,6 +3,59 @@ Here is a **developer-facing documentation** and a **Soroban RPC client interact
 
 # SoroTask — Developer Documentation
 
+---
+
+# Fuzz Testing
+
+SoroTask uses [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) (libFuzzer) to test core contract logic with randomized inputs.
+
+## Prerequisites
+
+```bash
+# Install cargo-fuzz (requires nightly toolchain)
+rustup toolchain install nightly
+cargo install cargo-fuzz
+```
+
+## Fuzz Targets
+
+| Target | What it tests |
+|---|---|
+| `fuzz_register` | `register()` with randomized `interval` and `gas_balance` — verifies zero-interval always panics and valid intervals never panic |
+| `fuzz_execute` | `execute()` with randomized `interval`, ledger timestamp, and `gas_balance` — surfaces unexpected panics in the execution path |
+
+## Running Fuzzers Locally
+
+Run from the `contract/` directory:
+
+```bash
+# Fuzz the register function (Ctrl+C to stop)
+cargo +nightly fuzz run fuzz_register
+
+# Fuzz the execute function (Ctrl+C to stop)
+cargo +nightly fuzz run fuzz_execute
+
+# Run with a time limit (e.g. 60 seconds)
+cargo +nightly fuzz run fuzz_register -- -max_total_time=60
+cargo +nightly fuzz run fuzz_execute  -- -max_total_time=60
+```
+
+## Reproducing a Crash
+
+If the fuzzer finds a crash it saves the input to `fuzz/artifacts/<target>/`. Reproduce it with:
+
+```bash
+cargo +nightly fuzz run fuzz_register fuzz/artifacts/fuzz_register/<crash-file>
+```
+
+## Build Only (no fuzzing)
+
+```bash
+cargo +nightly fuzz build
+```
+
+---
+
 This document explains how protocol engineers, dApp developers, and keeper operators integrate with SoroTask at a low level using Soroban RPC.
 
 ---

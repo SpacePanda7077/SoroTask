@@ -171,6 +171,8 @@ impl SoroTaskContract {
             (Symbol::new(&env, "TaskResumed"), task_id),
             config.creator.clone(),
         );
+    }
+
     pub fn monitor_paginated(env: Env, start_id: u64, limit: u64) -> Vec<ExecutableTask> {
         let now = env.ledger().timestamp();
         let counter: u64 = env
