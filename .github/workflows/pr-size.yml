@@ -90,7 +90,7 @@ jobs:
                   '',
                   `This PR touches **${totalLines} lines** ` +
                   `(+${additions} additions, \`-\`${deletions} deletions), ` +
-                  `which exceeds the project\'s **1,000-line limit**.`,
+                  `which exceeds the project's **1,000-line limit**.`,
                   '',
                   'Large PRs are hard to review, increase the risk of bugs slipping through, ',
                   'and slow down the merge queue for everyone. Please break this into smaller, ',
