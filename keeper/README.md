@@ -88,6 +88,24 @@ Once you have your prerequisite software and environment variables ready, follow
 
 If successful, you will see output indicating that the Keeper has started, along with logs of its periodic checks for due tasks!
 
+## Mock Soroban RPC for Faster Local Testing
+
+If you want to test keeper flows without a full Soroban node, the keeper includes a lightweight mock JSON-RPC server.
+
+```bash
+cd keeper
+npm run mock-rpc
+```
+
+Then point the keeper at it:
+
+```bash
+export SOROBAN_RPC_URL=http://127.0.0.1:4100
+export NETWORK_PASSPHRASE="Test SDF Future Network ; October 2022"
+```
+
+Detailed usage, supported methods, and test examples are in [docs/mock-soroban-rpc.md](./docs/mock-soroban-rpc.md).
+
 ## Troubleshooting
 
 ### Issue: "Account not found"

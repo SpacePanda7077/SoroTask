@@ -1,0 +1,68 @@
+# cargo-deny configuration for SoroTask contract
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+# ── Advisories ───────────────────────────────────────────────────────────────
+# Fail the build when known security advisories are found.
+[advisories]
+# The path to the advisory database.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# Reject crates with vulnerabilities
+vulnerability = "deny"
+
+# Reject unmaintained crates (warn only — set to "deny" for stricter policy)
+unmaintained = "warn"
+
+# Reject crates with unsound code advisories
+unsound = "deny"
+
+# Ignore specific advisories by ID if needed (add IDs here after review)
+ignore = []
+
+# ── Licenses ─────────────────────────────────────────────────────────────────
+# Only allow OSI-approved and permissive licenses.
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "ISC",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Unicode-DFS-2016",
+  "Zlib",
+]
+
+# Reject crates with no license specified
+unlicensed = "deny"
+
+# Reject crates using copyleft licenses (e.g. GPL) unless explicitly allowed
+copyleft = "deny"
+
+# Treat OSI-approved licenses not in the allow list as warnings
+allow-osi-fsf-free = "neither"
+
+# ── Bans ─────────────────────────────────────────────────────────────────────
+# Deny duplicate versions of the same crate and flag known-bad crates.
+[bans]
+# Warn on multiple versions of the same dependency
+multiple-versions = "warn"
+
+# Deny wildcard dependencies (e.g. foo = "*")
+wildcards = "deny"
+
+# Crates that are explicitly banned from the dependency tree
+deny = []
+
+# ── Sources ───────────────────────────────────────────────────────────────────
+# Only allow crates from crates.io and verified git sources.
+[sources]
+# Deny crates from unknown registries
+unknown-registry = "deny"
+
+# Deny crates from unknown git sources
+unknown-git = "deny"
+
+# Allow crates.io as the default registry
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

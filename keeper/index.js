@@ -8,12 +8,20 @@ const { ExecutionQueue } = require('./src/queue');
 const TaskPoller = require('./src/poller');
 const TaskRegistry = require('./src/registry');
 const { createLogger } = require('./src/logger');
+const { dryRunTask } = require('./src/dryRun');
 
 // Create root logger for the main module
 const logger = createLogger('keeper');
 
+// Parse --dry-run flag from CLI arguments
+const DRY_RUN = process.argv.includes('--dry-run');
+
 async function main() {
-    logger.info('Starting SoroTask Keeper');
+    if (DRY_RUN) {
+        logger.info('Starting SoroTask Keeper in DRY-RUN mode — no transactions will be submitted');
+    } else {
+        logger.info('Starting SoroTask Keeper');
+    }
 
     let config;
     try {
@@ -55,11 +63,26 @@ async function main() {
     queue.on('cycle:complete', (stats) => queueLogger.info('Cycle complete', stats));
 
     // Task executor function - calls contract.execute(keeper, task_id)
+    // In dry-run mode, simulates the transaction without submitting it.
     const executeTask = async (taskId) => {
+        const account = await server.getAccount(keypair.publicKey());
+        const deps = {
+            server,
+            keypair,
+            account,
+            contractId: config.contractId,
+            networkPassphrase: config.networkPassphrase || Networks.FUTURENET,
+        };
+
+        if (DRY_RUN) {
+            const result = await dryRunTask(taskId, deps);
+            logger.info('Dry-run result', { taskId, status: result.status, estimatedFee: result.simulation?.estimatedFee ?? null, error: result.error });
+            return;
+        }
+
         try {
             // Build the execute transaction
             const contract = new Contract(config.contractId);
-            const account = await server.getAccount(keypair.publicKey());
 
             const operation = contract.call(
                 'execute',
