@@ -1,4 +1,5 @@
 import Image from "next/image";
+import NotificationIcon from "./components/Notification/NotificationIcon";
 
 export default function Home() {
   return (
@@ -7,12 +8,17 @@ export default function Home() {
       <header className="border-b border-neutral-800 bg-neutral-950/50 backdrop-blur-md sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">S</div>
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+              S
+            </div>
             <h1 className="text-xl font-bold tracking-tight">SoroTask</h1>
           </div>
-          <button className="bg-neutral-100 text-neutral-900 px-4 py-2 rounded-md font-medium hover:bg-neutral-200 transition-colors">
-            Connect Wallet
-          </button>
+          <div className="flex justify-center items-center gap-5">
+            <button className="bg-neutral-100 text-neutral-900 px-4 py-2 rounded-md font-medium hover:bg-neutral-200 transition-colors">
+              Connect Wallet
+            </button>
+            <NotificationIcon />
+          </div>
         </div>
       </header>
 
@@ -23,21 +29,45 @@ export default function Home() {
             <h2 className="text-2xl font-bold">Create Automation Task</h2>
             <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-xl p-6 space-y-4 shadow-xl">
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-1">Target Contract Address</label>
-                <input type="text" placeholder="C..." className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" />
+                <label className="block text-sm font-medium text-neutral-400 mb-1">
+                  Target Contract Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="C..."
+                  className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-400 mb-1">Function Name</label>
-                <input type="text" placeholder="harvest_yield" className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" />
+                <label className="block text-sm font-medium text-neutral-400 mb-1">
+                  Function Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="harvest_yield"
+                  className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-400 mb-1">Interval (seconds)</label>
-                  <input type="number" placeholder="3600" className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" />
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Interval (seconds)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="3600"
+                    className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-neutral-400 mb-1">Gas Balance (XLM)</label>
-                  <input type="number" placeholder="10" className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm" />
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Gas Balance (XLM)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    className="w-full bg-neutral-900 border border-neutral-700/50 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+                  />
                 </div>
               </div>
               <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg transition-colors mt-2 shadow-lg shadow-blue-600/20">
@@ -72,7 +102,9 @@ export default function Home() {
               <tbody className="divide-y divide-neutral-800 bg-neutral-900/50">
                 {/* Mock Row */}
                 <tr className="hover:bg-neutral-800/50 transition-colors">
-                  <td className="px-6 py-4 font-mono text-neutral-300">#1024</td>
+                  <td className="px-6 py-4 font-mono text-neutral-300">
+                    #1024
+                  </td>
                   <td className="px-6 py-4 font-mono">CC...A12B</td>
                   <td className="px-6 py-4 font-mono">GA...99X</td>
                   <td className="px-6 py-4">
